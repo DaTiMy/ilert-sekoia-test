@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 2026-04-13 - 1.1.0
+
+### Added
+
+- Normalize Sekoia.io alert `status` field (object → string) before forwarding to ilert,
+  so the ilert SekoiaEventConverter can resolve ALERT/ACCEPT/RESOLVE event types.
+
 ## 2026-04-13 - 1.0.1
 
 ### Changed

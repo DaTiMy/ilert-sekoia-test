@@ -1,11 +1,26 @@
 # coding: utf-8
 
 # third parties
+import pytest
 import requests_mock
 
 # internals
 from ilert.action_ilert_trigger_alert import IlertTriggerAlertAction
 from ilert.constants import DEFAULT_EVENTS_URL
+
+
+def _build_alert(status):
+    return {
+        "urgency": {"current_value": 42, "display": "medium"},
+        "short_id": "AL98312BKWZ",
+        "entity": {"name": "Red fox"},
+        "title": "Test alert for ilert",
+        "alert_type": {"category": "network", "value": "c2-traffic"},
+        "source": "172.16.0.5",
+        "target": "example.org.fake",
+        "details": "some details here",
+        "status": status,
+    }
 
 
 def test_ilert_postalert_default():
@@ -18,16 +33,8 @@ def test_ilert_postalert_default():
     base_url = "https://api.sekoia.io/"
     api_key = "XKDF84729HNQP16"
 
-    alert_info = {
-        "urgency": {"current_value": 42, "display": "medium"},
-        "short_id": "AL98312BKWZ",
-        "entity": {"name": "Red fox"},
-        "title": "Test alert for ilert",
-        "alert_type": {"category": "network", "value": "c2-traffic"},
-        "source": "172.16.0.5",
-        "target": "example.org.fake",
-        "details": "some details here",
-    }
+    alert_info = _build_alert({"name": "Pending", "uuid": "abc"})
+
     with requests_mock.Mocker() as mock:
         mock.get(
             f"{base_url}v1/sic/alerts/{alert_uuid}",
@@ -43,4 +50,25 @@ def test_ilert_postalert_default():
         assert history[0].method == "GET"
         assert history[1].method == "POST"
         assert history[1].url == hook_url
-        assert history[1].json() == alert_info
+
+        sent = history[1].json()
+        assert sent["status"] == "pending"
+        assert sent["title"] == alert_info["title"]
+
+
+@pytest.mark.parametrize(
+    "raw_status,expected",
+    [
+        ({"name": "Closed"}, "closed"),
+        ({"name": "Rejected"}, "closed"),
+        ({"name": "Acknowledged"}, "acknowledged"),
+        ({"name": "Resolved"}, "resolved"),
+        ({"name": "Pending"}, "pending"),
+        ({"name": "Ongoing"}, "ongoing"),
+        ("closed", "closed"),
+        ("acknowledged", "acknowledged"),
+        (None, "open"),
+    ],
+)
+def test_status_mapping(raw_status, expected):
+    assert IlertTriggerAlertAction._map_status(_build_alert(raw_status)) == expected
